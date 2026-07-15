@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据面板 · 伯努利原理调研</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f4f8;color:#2d3748;line-height:1.7}
+.header{background:linear-gradient(135deg,#0f2b4a,#1a4a7a);color:#fff;text-align:center;padding:36px 20px}
+.header h1{font-size:1.5rem;font-weight:700}
+.header p{opacity:.8;margin-top:6px;font-size:.9rem}
+.container{max-width:960px;margin:0 auto;padding:24px 20px 60px}
+.card{background:#fff;border-radius:10px;padding:24px 28px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.card h2{font-size:1.15rem;color:#1a4a7a;margin-bottom:12px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:#f7fafc;border-radius:10px;padding:18px;text-align:center}
+.stat-card .val{font-size:2rem;font-weight:800;color:#1a4a7a}
+.stat-card .lbl{font-size:.82rem;color:#718096;margin-top:4px}
+.stat-card.red .val{color:#e53e3e}
+.stat-card.amber .val{color:#d69e2e}
+.stat-card.green .val{color:#38a169}
+.btn{display:inline-block;padding:12px 32px;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;margin:4px}
+.btn-primary{background:#1a4a7a;color:#fff}
+.btn-primary:hover{background:#2b6cb0}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.chart-section{background:#fff;border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.chart-section h3{margin-bottom:16px}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:700px){.chart-row{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #e2e8f0}
+th{background:#f7fafc;font-weight:700;color:#4a5568;font-size:.78rem;text-transform:uppercase}
+.correct{color:#38a169;font-weight:700}
+.wrong{color:#e53e3e}
+.status{text-align:center;padding:40px;color:#718096}
+.status.loading{color:#2b6cb0}
+.status.error{color:#e53e3e}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📊 调研数据面板</h1>
+  <p>实时收集的真实用户答卷数据 &nbsp;|&nbsp; <a href="./" style="color:#90cdf4">← 返回问卷</a></p>
+</div>
+<div class="container">
+
+<div class="card">
+  <h2>📈 数据概览</h2>
+  <div class="stat-grid" id="statGrid">
+    <div class="stat-card"><div class="val" id="statVisits">-</div><div class="lbl">页面访问量</div></div>
+    <div class="stat-card"><div class="val" id="statResponses">-</div><div class="lbl">收集答卷数</div></div>
+    <div class="stat-card amber"><div class="val" id="statAvg">-</div><div class="lbl">平均得分 / 8</div></div>
+    <div class="stat-card red"><div class="val" id="statLow">-</div><div class="lbl">得分 ≤3 比例</div></div>
+  </div>
+  <button class="btn btn-primary" onclick="loadData()" id="refreshBtn">🔄 刷新数据</button>
+  <span style="color:#a0aec0;font-size:.82rem;margin-left:12px" id="updateTime"></span>
+</div>
+
+<div class="chart-row">
+  <div class="chart-section"><h3>📊 各题正确率</h3><div style="position:relative"><canvas id="chartQ"></canvas></div></div>
+  <div class="chart-section"><h3>📈 得分分布</h3><div style="position:relative"><canvas id="chartS"></canvas></div></div>
+</div>
+
+<div class="card" id="tableCard" style="display:none">
+  <h2>📋 最近答卷记录</h2>
+  <div style="overflow-x:auto"><table id="respTable"><thead><tr><th>#</th><th>时间</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Q5</th><th>Q6</th><th>Q7</th><th>Q8</th><th>得分</th></tr></thead><tbody id="respBody"></tbody></table></div>
+</div>
+
+<div class="status" id="statusMsg">点击「刷新数据」加载最新数据</div>
+
+</div>
+
+<script>
+const OWNER='ZorvathXalyn',REPO='bernoulli-survey',BRANCH='main';
+const QL=['Q1本质','Q2条件','Q3谬误','Q4升力','Q5因果','Q6压缩','Q7来源','Q8边界'];
+const CORRECT=[1,1,1,1,1,1,1,1];
+const OPTS=['A','B','C','D'];
+
+let allResponses=[],visitCount=0;
+let charts=[];
+
+async function gh(path){const u=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`;const r=await fetch(u);if(!r.ok)throw new Error(r.status);const d=await r.json();return d}
+
+async function loadData(){
+  const s=document.getElementById('statusMsg');s.className='status loading';s.textContent='⏳ 正在加载数据...';
+  document.getElementById('refreshBtn').disabled=true;
+
+  try{
+    // Load visit counter
+    try{const vr=await fetch('https://api.countapi.xyz/get/bernoulli-survey-zxv/visits');const vd=await vr.json();visitCount=vd.value||0}catch(e){visitCount='?'}
+
+    // Load response files
+    allResponses=[];
+    try{
+      const dir=await gh('responses');
+      const files=Array.isArray(dir)?dir.filter(f=>f.name.endsWith('.json')):[];
+      for(const f of files){
+        try{
+          const fc=await gh(`responses/${f.name}`);
+          const data=JSON.parse(atob(fc.content));
+          allResponses.push(data);
+        }catch(e){/* skip bad files */}
+      }
+    }catch(e){/* responses/ dir might not exist yet */}
+
+    render();
+    s.className='status';s.style.display='none';
+  }catch(e){
+    s.className='status error';s.textContent='❌ 加载失败: '+e.message+' （可能需要登录 GitHub 或检查网络）';
+  }
+  document.getElementById('refreshBtn').disabled=false;
+}
+
+function render(){
+  const N=allResponses.length;
+
+  document.getElementById('statVisits').textContent=visitCount||'?';
+  document.getElementById('statResponses').textContent=N;
+  document.getElementById('updateTime').textContent=N?'更新于 '+new Date().toLocaleTimeString():'';
+
+  if(N===0){
+    document.getElementById('statAvg').textContent='-';
+    document.getElementById('statLow').textContent='-';
+    document.getElementById('tableCard').style.display='none';
+    return;
+  }
+
+  // Stats
+  const scores=allResponses.map(r=>r.score);
+  const avg=(scores.reduce((a,b)=>a+b,0)/N).toFixed(2);
+  const lowPct=Math.round(scores.filter(s=>s<=3).length/N*100);
+
+  // Per-question
+  const qCounts=Array.from({length:8},()=>[0,0,0,0]);
+  allResponses.forEach(r=>{r.answers.forEach((a,qi)=>qCounts[qi][a]++)});
+  const qCorrect=qCounts.map((c,qi)=>({rate:c[CORRECT[qi]]/N,counts:c}));
+
+  document.getElementById('statAvg').textContent=avg;
+  document.getElementById('statLow').textContent=lowPct+'%';
+
+  // Charts
+  charts.forEach(c=>c.destroy());charts=[];
+
+  const ctx1=document.getElementById('chartQ');
+  if(ctx1)charts.push(new Chart(ctx1,{type:'bar',data:{labels:QL,datasets:[{label:'正确率',data:qCorrect.map(q=>q.rate*100),backgroundColor:qCorrect.map(q=>q.rate>=.35?'rgba(56,161,105,.8)':q.rate>=.25?'rgba(214,158,46,.8)':'rgba(229,62,62,.8)'),borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{max:100,ticks:{callback:v=>v+'%'}}}}}));
+
+  const sd=new Array(9).fill(0);scores.forEach(s=>sd[s]++);
+  const ctx2=document.getElementById('chartS');
+  if(ctx2)charts.push(new Chart(ctx2,{type:'bar',data:{labels:Array.from({length:9},(_,i)=>i+'分'),datasets:[{label:'人数',data:sd,backgroundColor:sd.map((_,i)=>i<=3?'rgba(229,62,62,.7)':i<=5?'rgba(214,158,46,.7)':'rgba(56,161,105,.7)'),borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:Math.max(1,Math.ceil(N/10))}}}}}));
+
+  // Table (last 30)
+  document.getElementById('tableCard').style.display='';
+  const recent=allResponses.slice(-30).reverse();
+  document.getElementById('respBody').innerHTML=recent.map((r,i)=>
+    `<tr><td>${N-i}</td><td>${r.time||'-'}</td>${r.answers.map((a,qi)=>`<td class="${a===CORRECT[qi]?'correct':'wrong'}">${OPTS[a]}</td>`).join('')}<td><strong>${r.score}/8</strong></td></tr>`
+  ).join('');
+}
+
+loadData();
+</script>
+</body>
+</html>
