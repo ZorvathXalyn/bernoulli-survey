@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>样本生成器 · 伯努利原理调研</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f4f8;color:#2d3748;line-height:1.7}
+.header{background:linear-gradient(135deg,#0f2b4a,#1a4a7a);color:#fff;text-align:center;padding:40px 20px}
+.header h1{font-size:1.6rem;font-weight:700}
+.header p{opacity:.8;margin-top:6px;font-size:.9rem}
+.container{max-width:800px;margin:0 auto;padding:24px 20px 60px}
+.card{background:#fff;border-radius:10px;padding:24px 28px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.card h2{font-size:1.15rem;color:#1a4a7a;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
+.card h3{font-size:1rem;color:#2d3748;margin:16px 0 8px}
+.btn{display:inline-block;padding:12px 36px;border:none;border-radius:8px;font-size:1.05rem;font-weight:600;cursor:pointer;transition:all .2s;margin:4px}
+.btn-primary{background:#1a4a7a;color:#fff}
+.btn-primary:hover{background:#2b6cb0;transform:translateY(-1px);box-shadow:0 4px 14px rgba(26,74,122,.35)}
+.btn-outline{background:#fff;color:#1a4a7a;border:2px solid #1a4a7a}
+.btn-outline:hover{background:#ebf8ff}
+.btn-success{background:#38a169;color:#fff}
+.btn-success:hover{background:#48bb78}
+.btn-row{text-align:center;margin:20px 0}
+.seed-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.seed-row label{font-weight:600;white-space:nowrap}
+.seed-row input{padding:8px 12px;border:2px solid #e2e8f0;border-radius:6px;font-size:1rem;width:160px;font-family:monospace}
+.seed-row input:focus{border-color:#2b6cb0;outline:none}
+.preview-wrap{overflow-x:auto;margin-top:14px}
+.preview-table{border-collapse:collapse;font-size:.82rem;width:100%;white-space:nowrap}
+.preview-table th,.preview-table td{padding:6px 10px;text-align:center;border:1px solid #e2e8f0}
+.preview-table th{background:#f7fafc;font-weight:700;color:#4a5568}
+.preview-table .correct{color:#38a169;font-weight:700}
+.preview-table .wrong{color:#e53e3e}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.stat-item{background:#f7fafc;border-radius:8px;padding:14px;text-align:center}
+.stat-item .val{font-size:1.5rem;font-weight:800;color:#1a4a7a}
+.stat-item .lbl{font-size:.78rem;color:#718096;margin-top:2px}
+.info-box{background:#ebf8ff;border-left:3px solid #2b6cb0;padding:12px 16px;border-radius:0 8px 8px 0;font-size:.88rem;color:#2a4365;margin:12px 0}
+pre{background:#1a202c;color:#e2e8f0;padding:16px 20px;border-radius:8px;overflow-x:auto;font-size:.82rem;line-height:1.5;margin:12px 0}
+pre .cm{color:#718096}pre .kw{color:#f6ad55}pre .fn{color:#63b3ed}pre .str{color:#68d391}
+.tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #e2e8f0}
+.tab-btn{flex:1;padding:10px;border:none;background:transparent;cursor:pointer;font-size:.9rem;font-weight:600;color:#718096;transition:all .2s}
+.tab-btn.active{color:#1a4a7a;border-bottom:3px solid #1a4a7a;margin-bottom:-2px}
+.tab-panel{display:none}.tab-panel.active{display:block}
+</style>
+</head>
+<body>
+<div class="header"><h1>📊 样本生成器</h1><p>开源小程序 — 确定性伪随机算法生成 100 名模拟受访者数据</p></div>
+<div class="container">
+<div class="card"><h2>⚙️ 参数配置</h2><div class="seed-row"><label>随机种子 (seed):</label><input type="number" id="seedInput" value="20260715"><button class="btn btn-outline" onclick="generate()" style="padding:8px 20px">🔄 重新生成</button></div><p style="color:#718096;font-size:.85rem">同一种子+同一算法→始终产生完全相同的 100 份样本。<strong>种子 20260715</strong> 为本研究默认种子。</p><div class="info-box"><strong>🔬 可复现性：</strong>任何人使用相同种子运行此生成器都将得到完全一致的样本数据。这是本研究数据可被独立验证的基础。</div></div>
+<div class="card" id="outputCard" style="display:none"><h2>📋 生成结果 <span id="seedLabel" style="font-weight:400;font-size:.85rem;color:#718096"></span></h2><div class="stat-grid" id="statGrid"></div><div class="tabs"><button class="tab-btn active" data-ptab="preview">数据预览</button><button class="tab-btn" data-ptab="dist">得分分布</button></div><div class="tab-panel active" id="ppreview"><div class="preview-wrap" id="previewTable"></div><p style="color:#718096;font-size:.8rem;margin-top:8px">仅显示前 15 条，完整数据请下载 CSV</p></div><div class="tab-panel" id="pdist"><div class="preview-wrap" id="distTable"></div></div></div>
+<div class="card" id="downloadCard" style="display:none"><h2>💾 下载样本数据</h2><div class="btn-row"><button class="btn btn-primary" onclick="downloadCSV()">📄 下载 CSV</button><button class="btn btn-primary" onclick="downloadJSON()">📦 下载 JSON</button><button class="btn btn-success" onclick="downloadJS()">📥 下载 JS 数据文件</button></div><div class="info-box" style="margin-top:16px"><strong>📥 JS 文件用途：</strong>将下载的 <code>survey-data.js</code> 与 <code>index.html</code> 放在同一目录，页面将自动加载此文件并动态计算所有统计图表。</div></div>
+<div class="card"><h2>🔍 算法说明</h2><p>本生成器使用 <strong>mulberry32</strong> 确定性伪随机数生成器（PRNG），配合 Fisher-Yates 洗牌算法，确保给定种子下输出完全确定。</p><pre><span class="cm">// 1. 定义每题各选项的目标人数分布</span>
+<span class="kw">const</span> targets = [[<span class="str">42,38,13,7</span>],...];
+<span class="cm">// 2. 为每题构造选项池</span>
+<span class="kw">const</span> pools = targets.<span class="fn">map</span>(t => <span class="fn">buildPool</span>(t));
+<span class="cm">// 3. 用 mulberry32(seed) 对每题的池独立洗牌</span>
+pools.<span class="fn">forEach</span>(p => <span class="fn">fisherYatesShuffle</span>(p, rng));
+<span class="cm">// 4. 第 i 位受访者取每池第 i 个元素</span></pre></div>
+</div>
+<script>
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const TARGETS=[[42,38,13,7],[28,22,18,32],[45,28,15,12],[38,18,25,19],[48,25,20,7],[32,35,10,23],[35,30,22,13],[12,40,28,20]];
+const CORRECT=[1,1,1,1,1,1,1,1];
+const QL=['Q1本质认知','Q2适用条件','Q3等时通过','Q4升力边界','Q5因果关系','Q6可压缩性','Q7理论来源','Q8应用边界'];
+const OPTS=['A','B','C','D'];
+let gd=null;
+function generateData(seed){const rng=mulberry32(seed);const pools=TARGETS.map(cs=>{const p=[];cs.forEach((c,i)=>{for(let j=0;j<c;j++)p.push(i)});for(let i=p.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[p[i],p[j]]=[p[j],p[i]]}return p});const rs=[];for(let i=0;i<100;i++){const a=pools.map(p=>p[i]);rs.push({answers:a,score:a.reduce((s,x,qi)=>s+(x===CORRECT[qi]?1:0),0)})}return{respondents:rs,seed}}
+function computeStats(rs){const N=rs.length;const pq=QL.map((_,qi)=>{const c=[0,0,0,0];rs.forEach(r=>c[r.answers[qi]]++);return{counts:c,cr:c[CORRECT[qi]]/N}});const sd=new Array(9).fill(0);rs.forEach(r=>sd[r.score]++);const avg=rs.reduce((s,r)=>s+r.score,0)/N;let med=0,cum=0;for(let i=0;i<9;i++){cum+=sd[i];if(cum>=50){med=i;break}}return{pq,sd,avg,med,lp:sd.slice(0,4).reduce((a,b)=>a+b,0)}}
+function render(d){const r=d.respondents,st=computeStats(r);document.getElementById('outputCard').style.display='';document.getElementById('downloadCard').style.display='';document.getElementById('seedLabel').textContent=`(种子: ${d.seed})`;
+document.getElementById('statGrid').innerHTML=`<div class="stat-item"><div class="val">${st.avg.toFixed(2)}</div><div class="lbl">平均分 / 8</div></div><div class="stat-item"><div class="val">${st.med}</div><div class="lbl">中位数 / 8</div></div><div class="stat-item"><div class="val">${st.lp}%</div><div class="lbl">得分 ≤3 分</div></div><div class="stat-item"><div class="val">${((1-st.pq.reduce((s,q)=>s+q.cr,0)/8)*100).toFixed(0)}%</div><div class="lbl">平均错误率</div></div>`;
+let h='<table class="preview-table"><thead><tr><th>#</th>'+QL.map(l=>`<th>${l}</th>`).join('')+'<th>得分</th></tr></thead><tbody>';
+for(let i=0;i<Math.min(15,100);i++){const rr=r[i];h+=`<tr><td><strong>${i+1}</strong></td>`+rr.answers.map((a,qi)=>`<td class="${a===CORRECT[qi]?'correct':'wrong'}">${OPTS[a]}</td>`).join('')+`<td><strong>${rr.score}</strong></td></tr>`}
+h+='<tr><td colspan="10" style="color:#718096">…… 共 100 条记录 ……</td></tr></tbody></table>';document.getElementById('previewTable').innerHTML=h;
+let dhtml='<table class="preview-table"><thead><tr><th>得分</th><th>人数</th><th>%</th><th>分布</th></tr></thead><tbody>';
+for(let s=0;s<=8;s++)dhtml+=`<tr><td><strong>${s}</strong></td><td>${st.sd[s]}</td><td>${st.sd[s]}%</td><td style="text-align:left">${'█'.repeat(st.sd[s])}</td></tr>`;dhtml+='</tbody></table>';document.getElementById('distTable').innerHTML=dhtml}
+function dl(filename,content,mime){const b=new Blob([content],{type:mime});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
+function downloadCSV(){const r=gd.respondents;const h=['受访者编号',...QL.map(l=>l+'_选项'),...QL.map(l=>l+'_正误'),'总分'];const rows=r.map((rr,i)=>[i+1,...rr.answers.map(a=>OPTS[a]),...rr.answers.map((a,qi)=>a===CORRECT[qi]?'✓':'✗'),rr.score]);dl('survey-data-100.csv','﻿'+[h,...rows].map(rr=>rr.join(',')).join('\n'),'text/csv;charset=utf-8')}
+function downloadJSON(){const r=gd.respondents,st=computeStats(r);dl('survey-data-100.json',JSON.stringify({meta:{title:'伯努利原理认知调研模拟数据集',sampleSize:100,seed:gd.seed,generatedAt:new Date().toISOString()},perQuestionStats:QL.map((l,qi)=>({question:l,optionCounts:{A:st.pq[qi].counts[0],B:st.pq[qi].counts[1],C:st.pq[qi].counts[2],D:st.pq[qi].counts[3]},correctOption:OPTS[CORRECT[qi]],correctRate:(st.pq[qi].cr*100).toFixed(1)+'%'})),scoreDistribution:st.sd.map((c,i)=>({score:i,count:c})),summary:{averageScore:st.avg.toFixed(2),medianScore:st.med,lowScorePct:st.lp+'%'},respondents:r.map((rr,i)=>({id:i+1,answers:rr.answers.map((a,qi)=>({question:QL[qi],choice:OPTS[a],correct:OPTS[CORRECT[qi]],isCorrect:a===CORRECT[qi]})),score:rr.score}))},null,2),'application/json')}
+function downloadJS(){const raw=gd.respondents.map(r=>r.answers);dl('survey-data.js',`window.__SURVEY_RAW__=${JSON.stringify(raw)};\nwindow.__SURVEY_META__=${JSON.stringify({seed:gd.seed,generatedAt:new Date().toISOString(),n:100,correctAnswers:CORRECT,questionLabels:QL,optionLabels:OPTS})};\n`,'application/javascript')}
+function generate(seed){if(seed===undefined)seed=parseInt(document.getElementById('seedInput').value)||20260715;document.getElementById('seedInput').value=seed;gd=generateData(seed);render(gd)}
+document.querySelectorAll('.tab-btn').forEach(b=>{b.addEventListener('click',()=>{const g=b.closest('.card');g.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');g.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));document.getElementById('p'+b.dataset.ptab).classList.add('active')})});
+generate(20260715);
+</script>
+</body>
+</html>
