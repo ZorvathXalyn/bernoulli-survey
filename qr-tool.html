@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>问卷二维码生成器</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js">
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f4f8;color:#2d3748;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:16px;padding:40px 36px;max-width:520px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.1);text-align:center}
+.card h1{font-size:1.5rem;color:#1a4a7a;margin-bottom:8px}
+.card .sub{font-size:.9rem;color:#718096;margin-bottom:28px}
+
+.url-input{width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:10px;font-size:1rem;text-align:center;transition:border-color .2s;margin-bottom:20px}
+.url-input:focus{border-color:#2b6cb0;outline:none}
+
+.qr-wrap{display:inline-block;padding:16px;background:#fff;border:3px dashed #e2e8f0;border-radius:12px;margin:12px 0 20px;min-height:200px;display:flex;align-items:center;justify-content:center}
+.qr-wrap.has-qr{border-style:solid;border-color:#38a169}
+.qr-placeholder{color:#a0aec0;font-size:.9rem}
+
+.btn-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-block;padding:12px 28px;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:#1a4a7a;color:#fff}
+.btn-primary:hover{background:#2b6cb0}
+.btn-success{background:#38a169;color:#fff}
+.btn-success:hover{background:#48bb78}
+.btn-outline{background:#fff;color:#1a4a7a;border:2px solid #1a4a7a}
+.btn-outline:hover{background:#ebf8ff}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+
+.url-preview{margin-top:14px;font-size:.82rem;color:#4a5568;word-break:break-all}
+.url-preview a{color:#2b6cb0}
+
+.deploy-hint{background:#fffff0;border:1px solid #faf089;border-radius:10px;padding:16px;margin-top:24px;text-align:left;font-size:.85rem;color:#744210;line-height:1.8}
+.deploy-hint strong{color:#c05621}
+.deploy-hint code{background:#fefcbf;padding:1px 5px;border-radius:3px;font-size:.85em}
+.deploy-hint ol{padding-left:18px;margin:8px 0}
+.deploy-hint li{margin-bottom:4px}
+
+@media(max-width:500px){.card{padding:24px 18px}.card h1{font-size:1.25rem}}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>📱 问卷传播二维码</h1>
+  <p class="sub">生成二维码 → 分享到微信群 → 扫码即可参与调研</p>
+
+  <input type="text" class="url-input" id="urlInput"
+    placeholder="粘贴你的问卷网址，如 https://xxx.github.io/bernoulli-survey/"
+    autocomplete="off">
+
+  <div class="qr-wrap" id="qrWrap">
+    <div class="qr-placeholder" id="qrPlaceholder">👆 在上方输入问卷网址后自动生成</div>
+    <div id="qrCode"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-success" id="downloadBtn" disabled onclick="downloadQR()">💾 下载二维码图片</button>
+    <button class="btn btn-outline" onclick="copyUrl()" id="copyBtn" disabled>📋 复制链接</button>
+  </div>
+  <div class="url-preview" id="urlPreview"></div>
+
+  <div class="deploy-hint">
+    <strong>💡 还没有网址？选一种免费方式部署：</strong>
+    <ol style="margin-top:6px;">
+      <li><strong>GitHub Pages</strong>（推荐）：<br>
+        → 打开 <code>github.com</code> 注册 → 新建仓库 → 点击 <code>Add file</code> → <code>Upload files</code> → 把整个 <code>bernoulli-survey</code> 文件夹拖进去 → <code>Settings</code> → <code>Pages</code> → 选 <code>main</code> 分支 → Save → 等 1 分钟得到网址</li>
+      <li style="margin-top:8px;"><strong>Netlify Drop</strong>（最快）：<br>
+        → 打开 <code>app.netlify.com/drop</code> → 把 <code>bernoulli-survey</code> 整个文件夹拖进去 → 立即得到网址</li>
+    </ol>
+    <p style="margin-top:8px;font-size:.82rem;">部署后把网址粘贴到上方输入框，即可生成二维码。</p>
+  </div>
+</div>
+
+<script>
+let qrInstance = null;
+const urlInput = document.getElementById('urlInput');
+const qrWrap = document.getElementById('qrWrap');
+const qrPlaceholder = document.getElementById('qrPlaceholder');
+const qrContainer = document.getElementById('qrCode');
+const downloadBtn = document.getElementById('downloadBtn');
+const copyBtn = document.getElementById('copyBtn');
+const urlPreview = document.getElementById('urlPreview');
+
+function clearQR() {
+  qrContainer.innerHTML = '';
+  if (qrInstance) { qrInstance = null; }
+  qrWrap.classList.remove('has-qr');
+  qrPlaceholder.style.display = '';
+  downloadBtn.disabled = true;
+  copyBtn.disabled = true;
+  urlPreview.innerHTML = '';
+}
+
+function generateQR(url) {
+  clearQR();
+  if (!url.trim()) return;
+
+  // Validate URL
+  let finalUrl = url.trim();
+  if (!/^https?:\/\//.test(finalUrl)) {
+    finalUrl = 'https://' + finalUrl;
+    urlInput.value = finalUrl;
+  }
+
+  qrPlaceholder.style.display = 'none';
+  qrWrap.classList.add('has-qr');
+
+  qrInstance = new QRCode(qrContainer, {
+    text: finalUrl,
+    width: 220,
+    height: 220,
+    colorDark: '#1a202c',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  downloadBtn.disabled = false;
+  copyBtn.disabled = false;
+  urlPreview.innerHTML = `<a href="${finalUrl}" target="_blank">${finalUrl}</a>`;
+}
+
+// Debounce input
+let debounceTimer;
+urlInput.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => generateQR(urlInput.value), 400);
+});
+
+// Also trigger on Enter key
+urlInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    clearTimeout(debounceTimer);
+    generateQR(urlInput.value);
+  }
+});
+
+function downloadQR() {
+  const canvas = qrContainer.querySelector('canvas');
+  if (!canvas) return;
+
+  // Create a larger canvas with padding for better sharing
+  const size = canvas.width;
+  const padding = 24;
+  const totalSize = size + padding * 2;
+
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = totalSize;
+  exportCanvas.height = totalSize + 40; // extra space for label
+  const ctx = exportCanvas.getContext('2d');
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+  // Draw QR code
+  ctx.drawImage(canvas, padding, padding);
+
+  // Draw label text
+  ctx.fillStyle = '#4a5568';
+  ctx.font = '14px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('扫码参与伯努利原理认知调研', totalSize / 2, totalSize + 28);
+
+  const link = document.createElement('a');
+  link.download = 'bernoulli-survey-qr.png';
+  link.href = exportCanvas.toDataURL('image/png');
+  link.click();
+}
+
+function copyUrl() {
+  const url = urlInput.value.trim();
+  if (!url) return;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const orig = btn.textContent;
+    btn.textContent = '✅ 已复制!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  }).catch(() => {
+    urlInput.select();
+    document.execCommand('copy');
+  });
+}
+</script>
+</body>
+</html>
