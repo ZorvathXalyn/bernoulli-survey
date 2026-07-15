@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>伯努利原理认知调研</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f4f8;color:#2d3748;line-height:1.7}
+.header{background:linear-gradient(135deg,#0f2b4a 0%,#1a4a7a 50%,#1e5a8a 100%);color:#fff;text-align:center;padding:56px 24px 48px;position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.header h1{font-size:2.2rem;font-weight:700;letter-spacing:.04em;position:relative}
+.header .subtitle{font-size:1.05rem;margin-top:12px;opacity:.85;position:relative;max-width:640px;margin-left:auto;margin-right:auto}
+.header .badge{display:inline-block;margin-top:16px;padding:4px 16px;border-radius:20px;background:rgba(255,255,255,.15);font-size:.85rem;position:relative}
+.container{max-width:960px;margin:0 auto;padding:0 20px}
+.tabs{display:flex;gap:0;margin-top:-1px;position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #e2e8f0}
+.tab-btn{flex:1;padding:14px 8px;border:none;background:transparent;cursor:pointer;font-size:1rem;font-weight:600;color:#718096;transition:all .2s;position:relative;text-align:center}
+.tab-btn:hover{color:#2b6cb0}
+.tab-btn.active{color:#1a4a7a}
+.tab-btn.active::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:3px;background:#1a4a7a;border-radius:3px 3px 0 0}
+.tab-panel{display:none;padding:40px 0 60px}
+.tab-panel.active{display:block}
+.survey-intro{background:#fff;border-radius:12px;padding:32px;margin-bottom:28px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.survey-intro h2{font-size:1.4rem;color:#1a4a7a;margin-bottom:8px}
+.survey-intro p{color:#4a5568;font-size:.95rem}
+.question-card{background:#fff;border-radius:12px;padding:28px 32px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);transition:box-shadow .2s;border-left:4px solid transparent}
+.question-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.question-card.answered-correct{border-left-color:#38a169}
+.question-card.answered-wrong{border-left-color:#e53e3e}
+.question-num{font-size:.85rem;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.question-title{font-size:1.1rem;font-weight:600;color:#1a202c;margin:6px 0 16px}
+.options{display:flex;flex-direction:column;gap:10px}
+.option-label{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:8px;border:2px solid #e2e8f0;cursor:pointer;transition:all .15s;font-size:.95rem}
+.option-label:hover{border-color:#90cdf4;background:#ebf8ff}
+.option-label input[type=radio]{margin-top:2px;accent-color:#1a4a7a;width:16px;height:16px;flex-shrink:0}
+.option-label.selected{border-color:#2b6cb0;background:#ebf8ff}
+.option-label.correct-answer{border-color:#38a169;background:#f0fff4}
+.option-label.wrong-answer{border-color:#e53e3e;background:#fff5f5}
+.option-label .letter{font-weight:700;color:#4a5568;min-width:24px}
+.feedback{display:none;margin-top:14px;padding:12px 16px;border-radius:8px;font-size:.9rem;line-height:1.6}
+.feedback.show{display:block}
+.feedback.correct{background:#f0fff4;border:1px solid #c6f6d5;color:#22543d}
+.feedback.wrong{background:#fff5f5;border:1px solid #fed7d7;color:#742a2a}
+.submit-row{text-align:center;margin:32px 0}
+.btn{display:inline-block;padding:14px 48px;border:none;border-radius:8px;font-size:1.05rem;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-primary{background:#1a4a7a;color:#fff}
+.btn-primary:hover{background:#2b6cb0;transform:translateY(-1px);box-shadow:0 4px 14px rgba(26,74,122,.35)}
+.btn-primary:disabled{background:#a0aec0;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-outline{background:#fff;color:#1a4a7a;border:2px solid #1a4a7a}
+.btn-outline:hover{background:#ebf8ff}
+.score-banner{display:none;text-align:center;padding:28px 24px;border-radius:12px;margin-bottom:28px}
+.score-banner.show{display:block}
+.score-banner .score-num{font-size:3.5rem;font-weight:800}
+.score-banner .score-label{font-size:1rem;margin-top:4px}
+.score-banner.perfect{background:#f0fff4;border:2px solid #38a169}
+.score-banner.perfect .score-num{color:#38a169}
+.score-banner.good{background:#fffff0;border:2px solid #d69e2e}
+.score-banner.good .score-num{color:#d69e2e}
+.score-banner.poor{background:#fff5f5;border:2px solid #e53e3e}
+.score-banner.poor .score-num{color:#e53e3e}
+.score-banner .comparison{margin-top:12px;font-size:.9rem;color:#4a5568}
+.results-header{margin-bottom:32px}
+.results-header h2{font-size:1.5rem;color:#1a4a7a;margin-bottom:8px}
+.results-header p{color:#4a5568}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-bottom:36px}
+.stat-card{background:#fff;border-radius:12px;padding:24px 20px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.stat-card .stat-value{font-size:2.2rem;font-weight:800}
+.stat-card .stat-label{font-size:.9rem;color:#718096;margin-top:4px}
+.stat-card.accent-red .stat-value{color:#e53e3e}
+.stat-card.accent-amber .stat-value{color:#d69e2e}
+.stat-card.accent-green .stat-value{color:#38a169}
+.stat-card.accent-blue .stat-value{color:#2b6cb0}
+.chart-section{background:#fff;border-radius:12px;padding:28px 24px;margin-bottom:24px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.chart-section h3{font-size:1.15rem;color:#1a202c;margin-bottom:20px}
+.chart-wrap{position:relative;width:100%}
+.chart-wrap canvas{width:100%!important}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:700px){.chart-row{grid-template-columns:1fr}}
+.misconception-table{width:100%;border-collapse:collapse;font-size:.9rem}
+.misconception-table th,.misconception-table td{padding:12px 16px;text-align:left;border-bottom:1px solid #e2e8f0}
+.misconception-table th{background:#f7fafc;font-weight:700;color:#4a5568;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+.misconception-table td.error-rate{font-weight:700}
+.misconception-table td.error-rate.high{color:#e53e3e}
+.misconception-table td.error-rate.medium{color:#d69e2e}
+.misconception-table tr:hover td{background:#f7fafc}
+.conclusion-box{background:linear-gradient(135deg,#fff5f5 0%,#fff 100%);border:2px solid #fc8181;border-radius:12px;padding:28px 32px;margin-top:28px}
+.conclusion-box h3{color:#c53030;font-size:1.2rem;margin-bottom:12px}
+.conclusion-box ul{padding-left:20px;color:#4a5568}
+.conclusion-box li{margin-bottom:6px}
+.footer{text-align:center;padding:32px 20px;color:#a0aec0;font-size:.8rem;border-top:1px solid #e2e8f0;margin-top:40px}
+@media(max-width:600px){.header h1{font-size:1.5rem}.header{padding:36px 16px 32px}.question-card{padding:18px 16px}.option-label{padding:10px 12px;font-size:.9rem}.stats-grid{grid-template-columns:1fr 1fr;gap:10px}.stat-card{padding:16px 12px}.stat-card .stat-value{font-size:1.6rem}}
+</style>
+</head>
+<body>
+<header class="header">
+<h1>伯努利原理认知调研</h1>
+<p class="subtitle">一项关于公众对伯努利原理本质认识与适用条件理解程度的模拟调查研究</p>
+<span class="badge">流体力学 · 科学教育 · 认知研究</span>
+</header>
+<div class="tabs" id="tabBar">
+<button class="tab-btn active" data-tab="survey">📋 参与问卷</button>
+<button class="tab-btn" data-tab="results">📊 调研结果</button>
+</div>
+<div class="container">
+<div class="tab-panel active" id="panel-survey">
+<div class="survey-intro"><h2>关于本次调研</h2><p>伯努利原理是流体力学中最广为人知的原理之一，但其本质（能量守恒）和严格的适用条件常被大众忽视或误解。本问卷共<strong>8 道单选题</strong>，完成问卷后将看到答案解析以及与模拟调研数据的对比。</p></div>
+<div id="scoreBanner" class="score-banner"></div>
+<form id="surveyForm"></form>
+<div class="submit-row"><button type="button" class="btn btn-primary" id="submitBtn" disabled>提交答卷</button><p style="margin-top:10px;color:#a0aec0;font-size:.85rem" id="progressHint">请完成全部 8 道题目后提交</p></div>
+</div>
+<div class="tab-panel" id="panel-results">
+<div class="results-header"><h2>模拟调研结果展示</h2><p>以下数据基于<strong>100 名</strong>模拟受访者的问卷作答结果。数据来源于外部样本文件 <code>survey-data.js</code>，所有统计图表均从原始数据动态计算。</p></div>
+<div class="stats-grid" id="statsGrid"></div>
+<div class="chart-section"><h3>📊 各题正确率对比</h3><div class="chart-wrap"><canvas id="chartAccuracy"></canvas></div></div>
+<div class="chart-row"><div class="chart-section"><h3>📈 受访者得分分布</h3><div class="chart-wrap"><canvas id="chartScoreDist"></canvas></div></div><div class="chart-section"><h3>🎯 各维度认知误区发生率</h3><div class="chart-wrap"><canvas id="chartRadar"></canvas></div></div></div>
+<div class="chart-section"><h3>📋 认知误区详细数据</h3><div style="overflow-x:auto"><table class="misconception-table" id="misconTable"></table></div></div>
+<div class="conclusion-box"><h3>🔍 调研结论</h3><ul id="conclusionList"></ul></div>
+</div>
+</div>
+<footer class="footer"><p>伯努利原理认知调研 · 模拟研究 · <a href="generator.html" style="color:#a0aec0">样本生成器</a></p></footer>
+
+<script src="survey-data.js"></script>
+<script>
+const questions=[{id:1,dimension:'本质认知',title:'伯努利原理的<strong>本质</strong>是什么？',options:['流体流速越快，压强越小——这是一种独立的、基本的经验规律','理想流体在定常流动中，沿同一条流线的机械能（动能+压力能+势能）守恒','流体总是自发地从高压区域流向低压区域','流体的密度随流速增大而减小，从而引起压强变化'],correct:1,explanation:'伯努利原理的本质是<strong>能量守恒定律</strong>在理想流体定常流动中的体现。它不是一个独立的经验规律，而是机械能守恒在流体中的具体形式：沿流线，动能（½ρv²）、压力能（p）和势能（ρgh）之和为常数。'},{id:2,dimension:'适用条件',title:'伯努利原理的<strong>适用条件</strong>包括以下哪一项？',options:['适用于任何流体在任何条件下的流动','仅适用于无粘性、不可压缩的流体，在定常流动中且需沿同一条流线','仅适用于气体，严格不适用于液体','适用于所有低速流动，无需其他附加条件'],correct:1,explanation:'伯努利原理有<strong>严格的适用条件</strong>：①流体无粘性（理想流体）；②不可压缩（密度恒定）；③定常流动；④沿同一条流线。实际流体往往不满足全部条件，直接应用需谨慎。'},{id:3,dimension:'等时通过谬误',title:'关于飞机机翼升力的"<strong>等时通过理论</strong>"（气流在机翼上下表面必须同时到达后缘），以下说法正确的是？',options:['这是正确的，是伯努利原理产生升力的物理基础','这是错误的——气流并无"约定"需同时到达，实际上上表面气流到达后缘的时间更早','该理论适用于低速飞行，但不适用于超音速飞行','这实质上是牛顿第三定律在机翼绕流中的体现'],correct:1,explanation:'"等时通过理论"（Equal Transit Time）是一个<strong>已被广泛证伪的经典谬误</strong>。实际上，机翼上表面的气流速度远快于下表面，上表面气流会比下表面气流<strong>更早</strong>到达后缘。'},{id:4,dimension:'升力解释',title:'伯努利原理能否<strong>独立完整</strong>地解释飞机升力的产生机制？',options:['能，飞机升力完全且仅由伯努利原理决定','不能，升力需要综合伯努利效应、气流偏转（动量变化/牛顿定律）、环量等多个因素才能完整解释','能，但仅限于亚音速飞行的情形','不能，因为伯努利原理只适用于液体，无法用于空气'],correct:1,explanation:'伯努利原理<strong>单独不足以完整解释升力</strong>。升力的产生涉及多个物理机制：气流经机翼后向下偏转产生的动量变化（牛顿第二、第三定律）、绕翼型的环量（库塔-儒可夫斯基定理），以及伯努利效应。'},{id:5,dimension:'因果关系',title:'许多人将伯努利原理通俗总结为"<strong>流速大的地方压强小，流速小的地方压强大</strong>"。从物理本质来看，以下评述最准确的是？',options:['这句话准确描述了因果律——流速变化是因，压强变化是果','这句话描述了<strong>相关性</strong>而非因果律——压强和流速在定常理想流动中由几何约束和守恒律<strong>同时确定</strong>，不存在单向因果箭头','这句话完全错误——伯努利原理说的是压强大的地方流速大','这句话仅适用于气体，因为液体不可压缩，压强不会随流速变化'],correct:1,explanation:'在定常理想流动中，压强场和速度场是<strong>同时</strong>被边界条件（管道几何）和守恒定律（质量、能量）确定的。伯努利方程是一个<strong>约束关系</strong>而非因果律——将其理解为"流速大导致压强小"的因果律，是物理教育领域公认的普遍误区。'},{id:6,dimension:'可压缩性',title:'伯努利原理是否可以<strong>直接</strong>应用于可压缩流体（如高速气体流动）？',options:['完全可以，公式形式和使用方法均不变','不可以直接应用——标准形式的伯努利原理假设流体不可压缩；可压缩流动需引入密度变化修正','可以，但需要将温度单位从摄氏度换算为开尔文','仅对理想气体在标准状况下适用'],correct:1,explanation:'标准伯努利方程 p+½ρv²+ρgh=const 基于<strong>不可压缩假设</strong>（ρ为常数）。当流速较高（Ma>0.3）、压缩性不可忽略时，需使用<strong>可压缩伯努利方程</strong>或其他更复杂的流动方程。'},{id:7,dimension:'理论来源',title:'从理论物理学的视角看，伯努利原理的<strong>理论本质</strong>是什么？',options:['一个独立的、最基本的物理定律，不需要从其他原理推导','能量守恒定律在理想流体定常流动中的具体表现形式','连续性方程（质量守恒）沿流线积分的结果','热力学第二定律在等温流动中的直接推论'],correct:1,explanation:'伯努利原理不是独立的物理定律，而是<strong>能量守恒原理</strong>在理想流体、定常流动条件下的特殊形式。方程中三项分别对应压力能密度、动能密度和势能密度——它们的和为常数，正是机械能守恒的体现。'},{id:8,dimension:'应用边界',title:'以下哪个场景中，<strong>直接</strong>应用标准伯努利原理进行分析最为合理？',options:['粘稠的蜂蜜从倾斜的勺子表面缓慢流下','理想水流沿光滑水平管道的定常、无旋流动','跑车在高速公路上急加速时周围湍流空气的运动','飓风眼壁附近剧烈的旋转上升气流'],correct:1,explanation:'选项B最符合适用条件：水可近似为不可压缩、低粘性流体，光滑管道内的定常流动沿流线满足能量守恒。A（高粘性）、C（非定常+湍流）、D（强湍流+可压缩性显著）均严重偏离基本假设。'}];
+
+let simulatedRespondents=[],questionStats=[],scoreDist=[],avgScore=0,lowScorePct=0,medianScore=0;
+
+function computeAllStats(raw){const N=raw.length;questionStats=questions.map((q,qi)=>{const c=[0,0,0,0];raw.forEach(r=>c[r[qi]]++);const cr=c[q.correct]/N;return{questionId:q.id,dimension:q.dimension,title:q.title.replace(/<\/?strong>/g,''),counts:c,correctRate:cr,errorRate:1-cr}});scoreDist=new Array(9).fill(0);raw.forEach(a=>{let s=0;a.forEach((ans,qi)=>{if(ans===questions[qi].correct)s++});scoreDist[s]++});simulatedRespondents=raw;avgScore=scoreDist.reduce((s,c,i)=>s+i*c,0)/N;lowScorePct=scoreDist.slice(0,4).reduce((a,b)=>a+b,0);let cum=0;medianScore=0;for(let i=0;i<scoreDist.length;i++){cum+=scoreDist[i];if(cum>=50){medianScore=i;break}}}
+function initData(){if(typeof window.__SURVEY_RAW__!=='undefined'&&Array.isArray(window.__SURVEY_RAW__)){computeAllStats(window.__SURVEY_RAW__)}}
+
+const form=document.getElementById('surveyForm'),submitBtn=document.getElementById('submitBtn'),scoreBanner=document.getElementById('scoreBanner'),progressHint=document.getElementById('progressHint');
+let userAnswers={},submitted=false;
+
+questions.forEach((q,qi)=>{const card=document.createElement('div');card.className='question-card';card.id=`q-card-${qi}`;card.innerHTML=`<div class="question-num">第 ${qi+1} 题 · ${q.dimension}</div><div class="question-title">${q.title}</div><div class="options">${q.options.map((opt,oi)=>`<label class="option-label" id="q${qi}-opt${oi}"><input type="radio" name="q${qi}" value="${oi}"><span class="letter">${'ABCD'[oi]}.</span><span>${opt}</span></label>`).join('')}</div><div class="feedback" id="fb-${qi}"></div>`;form.appendChild(card);card.querySelectorAll('input[type=radio]').forEach(radio=>{radio.addEventListener('change',()=>{userAnswers[qi]=parseInt(radio.value);card.querySelectorAll('.option-label').forEach(l=>l.classList.remove('selected'));document.getElementById(`q${qi}-opt${radio.value}`).classList.add('selected');checkAllAnswered()})})});
+
+function checkAllAnswered(){const all=questions.every((_,i)=>userAnswers[i]!==undefined);submitBtn.disabled=!all;progressHint.textContent=all?'全部题目已作答，点击提交查看结果':`已答 ${Object.keys(userAnswers).length} / 8 题`}
+
+submitBtn.addEventListener('click',()=>{if(submitted){submitted=false;userAnswers={};submitBtn.textContent='提交答卷';scoreBanner.classList.remove('show');questions.forEach((_,qi)=>{const card=document.getElementById(`q-card-${qi}`);card.classList.remove('answered-correct','answered-wrong');card.querySelectorAll('.option-label').forEach(l=>{l.classList.remove('selected','correct-answer','wrong-answer')});card.querySelectorAll('input[type=radio]').forEach(r=>r.checked=false);document.getElementById(`fb-${qi}`).classList.remove('show','correct','wrong')});checkAllAnswered();window.scrollTo({top:0,behavior:'smooth'});return}
+let score=0;questions.forEach((q,qi)=>{const ua=userAnswers[qi],card=document.getElementById(`q-card-${qi}`),fb=document.getElementById(`fb-${qi}`);if(ua===q.correct){score++;card.classList.add('answered-correct');document.getElementById(`q${qi}-opt${ua}`).classList.add('correct-answer');fb.className='feedback correct show';fb.innerHTML='✅ <strong>回答正确！</strong> '+q.explanation}else{card.classList.add('answered-wrong');document.getElementById(`q${qi}-opt${ua}`).classList.add('wrong-answer');document.getElementById(`q${qi}-opt${q.correct}`).classList.add('correct-answer');fb.className='feedback wrong show';fb.innerHTML='❌ <strong>回答错误。</strong> '+q.explanation}});
+const pct=Math.round(score/8*100),N=simulatedRespondents.length||100;let bannerClass,label,comparison;
+if(scoreDist.length>0){const nb=scoreDist.slice(0,score).reduce((a,b)=>a+b,0),ne=scoreDist[score]||0,pr=Math.round((nb+ne/2)/N*100);if(score>=7){bannerClass='perfect';label='出色！';comparison=`在 ${N} 名受访者中，您的得分超过了约 <strong>${nb}</strong> 人（前 ${100-pr}%），对伯努利原理具有全面且准确的理解。`}else if(score>=4){bannerClass='good';label='良好';comparison=`您的得分超过了约 <strong>${nb}</strong> 名受访者（超过约 ${pr}% 的人），具备一定基础但仍存在明显的认知偏差。`}else{bannerClass='poor';label='需加强';comparison=`约 <strong>${lowScorePct}%</strong> 的受访者得分同样 ≤3 分，反映出对伯努利原理的认知存在<strong>系统性和普遍性</strong>的偏差。`}}else{bannerClass='good';label='';comparison='（样本数据未加载，无法进行对比）'}
+scoreBanner.className=`score-banner show ${bannerClass}`;scoreBanner.innerHTML=`<div class="score-label">您的得分</div><div class="score-num">${score} / 8</div><div class="score-label">${label}（正确率 ${pct}%）</div><div class="comparison">${comparison}</div><button class="btn btn-outline" style="margin-top:16px" onclick="document.getElementById('tabBar').querySelector('[data-tab=results]').click();window.scrollTo({top:0,behavior:'smooth'})">查看调研结果 →</button>`;submitted=true;submitBtn.textContent='重新作答';document.getElementById('panel-survey').scrollIntoView({behavior:'smooth',block:'start'})});
+
+function renderResults(){if(!questionStats.length){document.getElementById('statsGrid').innerHTML='<div class="stat-card" style="grid-column:1/-1"><div class="stat-label">⚠️ 未找到样本数据文件 survey-data.js，请先运行 generate-data.js 生成数据。</div></div>';return}
+const N=simulatedRespondents.length;
+document.getElementById('statsGrid').innerHTML=`<div class="stat-card accent-red"><div class="stat-value">${lowScorePct}%</div><div class="stat-label">认知存在显著偏差的受访者<br>（得分 ≤ 3/8）</div></div><div class="stat-card accent-amber"><div class="stat-value">${avgScore.toFixed(1)} / 8</div><div class="stat-label">平均得分</div></div><div class="stat-card accent-blue"><div class="stat-value">${medianScore} / 8</div><div class="stat-label">中位数得分</div></div><div class="stat-card accent-green"><div class="stat-value">${((1-questionStats.reduce((s,q)=>s+q.correctRate,0)/questionStats.length)*100).toFixed(0)}%</div><div class="stat-label">平均错误率</div></div>`;
+document.getElementById('misconTable').innerHTML=`<thead><tr><th>题号</th><th>考察维度</th><th>题目</th><th>A</th><th>B</th><th>C</th><th>D</th><th>正确率</th><th>错误率</th></tr></thead><tbody>${questionStats.map(s=>`<tr><td><strong>Q${s.questionId}</strong></td><td>${s.dimension}</td><td>${s.title}</td>${s.counts.map((c,i)=>`<td style="${i===questions[s.questionId-1].correct?'color:#38a169;font-weight:700':''}">${c}人</td>`).join('')}<td style="color:#38a169;font-weight:700">${(s.correctRate*100).toFixed(0)}%</td><td class="error-rate ${s.errorRate>=0.7?'high':s.errorRate>=0.6?'medium':''}">${(s.errorRate*100).toFixed(0)}%</td></tr>`).join('')}</tbody>`;
+const qe=(i)=>questionStats[i]?(questionStats[i].errorRate*100).toFixed(0):'--';
+document.getElementById('conclusionList').innerHTML=`<li><strong>超过 70%</strong> 的受访者对伯努利原理的<strong>适用条件</strong>存在显著认知偏差（Q2 错误率 ${qe(1)}%）。</li><li><strong>超过 80%</strong> 的受访者错误地认为伯努利原理能够<strong>独立完整地解释升力</strong>（Q4 错误率 ${qe(3)}%）。</li><li><strong>约 ${qe(2)}%</strong> 的受访者相信"等时通过理论"这一经典谬误（Q3 错误率 ${qe(2)}%）。</li><li><strong>约 ${qe(4)}%</strong> 的受访者将伯努利原理误解为<strong>因果律</strong>，未能认识到"流速大压强小"只是相关性描述（Q5 错误率 ${qe(4)}%）。</li><li>仅有不足 <strong>${100-lowScorePct}%</strong> 的受访者对伯努利原理具备较为全面和准确的理解（得分 ≥ 4/8）。</li><li>平均得分仅为 <strong>${avgScore.toFixed(1)}/8 分</strong>，中位数为 ${medianScore} 分，表明公众认知存在系统性偏差。</li>`;renderCharts()}
+
+let chartInstances=[];
+function renderCharts(){chartInstances.forEach(c=>c.destroy());chartInstances=[];Chart.defaults.font.family='-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif';Chart.defaults.font.size=13;
+const ctx1=document.getElementById('chartAccuracy');if(ctx1)chartInstances.push(new Chart(ctx1,{type:'bar',data:{labels:questionStats.map(s=>`Q${s.questionId}\n${s.dimension}`),datasets:[{label:'正确率',data:questionStats.map(s=>s.correctRate*100),backgroundColor:questionStats.map(s=>{const r=s.correctRate;return r>=.35?'rgba(56,161,105,.8)':r>=.25?'rgba(214,158,46,.8)':'rgba(229,62,62,.8)'}),borderColor:questionStats.map(s=>{const r=s.correctRate;return r>=.35?'#38a169':r>=.25?'#d69e2e':'#e53e3e'}),borderWidth:1.5,borderRadius:6},{label:'错误率',data:questionStats.map(s=>s.errorRate*100),backgroundColor:'rgba(203,213,224,.6)',borderColor:'#cbd5e0',borderWidth:1.5,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:true,aspectRatio:2,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw.toFixed(0)}%`}}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,max:100,ticks:{callback:v=>v+'%'},title:{display:true,text:'百分比'}}}}}));
+const ctx2=document.getElementById('chartScoreDist');if(ctx2)chartInstances.push(new Chart(ctx2,{type:'bar',data:{labels:Array.from({length:9},(_,i)=>`${i}分`),datasets:[{label:'人数',data:scoreDist,backgroundColor:scoreDist.map((_,i)=>i<=3?'rgba(229,62,62,.7)':i<=5?'rgba(214,158,46,.7)':'rgba(56,161,105,.7)'),borderColor:scoreDist.map((_,i)=>i<=3?'#e53e3e':i<=5?'#d69e2e':'#38a169'),borderWidth:1.5,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:true,aspectRatio:1.5,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'得分（满分 8 分）'},grid:{display:false}},y:{title:{display:true,text:`人数 (n=${simulatedRespondents.length})`},beginAtZero:true,ticks:{stepSize:5}}}}}));
+const ctx3=document.getElementById('chartRadar');if(ctx3){const dm={};questionStats.forEach(s=>{if(!dm[s.dimension])dm[s.dimension]={total:0,count:0};dm[s.dimension].total+=s.errorRate;dm[s.dimension].count++});const dl=Object.keys(dm),dr=dl.map(d=>(dm[d].total/dm[d].count)*100);chartInstances.push(new Chart(ctx3,{type:'radar',data:{labels:dl,datasets:[{label:'误区发生率 (%)',data:dr,backgroundColor:'rgba(229,62,62,.2)',borderColor:'#e53e3e',borderWidth:2,pointBackgroundColor:'#e53e3e',pointBorderColor:'#fff',pointBorderWidth:2,pointRadius:5}]},options:{responsive:true,maintainAspectRatio:true,aspectRatio:1.3,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:20,backdropColor:'transparent'},pointLabels:{font:{size:12}}}}}}))}}
+
+document.getElementById('tabBar').addEventListener('click',e=>{const btn=e.target.closest('.tab-btn');if(!btn)return;document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+btn.dataset.tab).classList.add('active');if(btn.dataset.tab==='results')renderResults();window.scrollTo({top:0,behavior:'smooth'})});
+
+initData();checkAllAnswered();if(questionStats.length)renderResults();
+</script>
+</body>
+</html>
